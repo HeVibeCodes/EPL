@@ -1,0 +1,44 @@
+{
+  "1X2": {
+    "model": "random_forest",
+    "accuracy": 0.4151436031331593,
+    "log_loss": 1.0745564441751392,
+    "per_class": {
+      "Home": {
+        "sensitivity": 0.5246913580246914,
+        "specificity": 0.665158371040724
+      },
+      "Draw": {
+        "sensitivity": 0.102803738317757,
+        "specificity": 0.8442028985507246
+      },
+      "Away": {
+        "sensitivity": 0.5526315789473685,
+        "specificity": 0.6022304832713755
+      }
+    }
+  },
+  "OverUnder2.5": {
+    "model": "random_forest",
+    "decision_threshold": 0.53,
+    "accuracy": 0.4830287206266319,
+    "auc": 0.5188912720673156,
+    "brier": 0.24859243436993098,
+    "sensitivity": 0.3875598086124402,
+    "specificity": 0.5977011494252874
+  },
+  "CardsOver3.5": {
+    "model": "random_forest",
+    "decision_threshold": 0.55,
+    "accuracy": 0.5613577023498695,
+    "auc": 0.5498170326014638,
+    "brier": 0.24483087771868833,
+    "sensitivity": 0.8472222222222222,
+    "specificity": 0.19161676646706588
+  },
+  "baseline_class_split": {
+    "0": 0.45877126449236105,
+    "2": 0.29407303066421064,
+    "1": 0.24715570484342833
+  }
+}

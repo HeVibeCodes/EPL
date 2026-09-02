@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Referees &mdash; Matchday Numbers{% endblock %}
+{% block content %}
+
+<section class="hero hero-small">
+  <h1>How each referee tends to officiate.</h1>
+  <p class="lede">Career averages across every match on record. Only referees with 5+ games are shown.</p>
+</section>
+
+<section class="table-wrap">
+  <table class="ref-table">
+    <thead>
+      <tr>
+        <th>Referee</th>
+        <th>Games</th>
+        <th>Cards / game</th>
+        <th>Fouls / game</th>
+        <th>Reds / game</th>
+        <th>Home win rate</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.Referee }}</td>
+        <td>{{ r.games }}</td>
+        <td><span class="pill" style="--fill: {{ (r.avg_cards / 6 * 100) | round(0) }}%">{{ r.avg_cards }}</span></td>
+        <td>{{ r.avg_fouls }}</td>
+        <td>{{ r.avg_reds }}</td>
+        <td>{{ (r.home_win_rate * 100) | round(1) }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<p class="footnote">Last updated {{ last_updated.strftime('%d %b %Y, %H:%M') }}.</p>
+{% endblock %}

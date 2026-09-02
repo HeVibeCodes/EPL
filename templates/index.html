@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Matchday Numbers &mdash; fixture predictor{% endblock %}
+{% block content %}
+
+<section class="hero">
+  <h1>Pick a fixture, get the numbers.</h1>
+  <p class="lede">Win probabilities, the goals line, and the cards line &mdash; built from
+    {{ n_matches }} Premier League matches across {{ n_seasons }} season{{ 's' if n_seasons != 1 else '' }},
+    weighted by each team's recent form and the referee appointed to the game.</p>
+</section>
+
+<section class="ticket" id="ticket">
+  <form id="predict-form" class="ticket-form">
+    <div class="team-field">
+      <label for="home">Home</label>
+      <select id="home" required>
+        <option value="" disabled selected>Select team</option>
+        {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+      </select>
+    </div>
+
+    <div class="vs">vs</div>
+
+    <div class="team-field">
+      <label for="away">Away</label>
+      <select id="away" required>
+        <option value="" disabled selected>Select team</option>
+        {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+      </select>
+    </div>
+
+    <div class="ref-field">
+      <label for="referee">Referee</label>
+      <select id="referee" required>
+        <option value="" disabled selected>Select referee</option>
+        {% for r in referees %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+      </select>
+    </div>
+
+    <button type="submit" class="predict-btn">Predict</button>
+  </form>
+
+  <div id="result" class="result" hidden>
+    <div class="result-heading">
+      <span id="res-home"></span>
+      <span class="result-score" id="res-score"></span>
+      <span id="res-away"></span>
+    </div>
+
+    <div class="outcome-bar" id="outcome-bar">
+      <div class="seg seg-home" id="seg-home"></div>
+      <div class="seg seg-draw" id="seg-draw"></div>
+      <div class="seg seg-away" id="seg-away"></div>
+    </div>
+    <div class="outcome-labels">
+      <span>Home win <b id="lbl-home"></b></span>
+      <span>Draw <b id="lbl-draw"></b></span>
+      <span>Away win <b id="lbl-away"></b></span>
+    </div>
+
+    <div class="markets">
+      <div class="market">
+        <h3>Total goals</h3>
+        <div class="market-bar"><div class="market-fill goals" id="fill-goals"></div></div>
+        <p><b id="lbl-over25"></b> over 2.5 &nbsp;&middot;&nbsp; <b id="lbl-under25"></b> under 2.5</p>
+      </div>
+      <div class="market">
+        <h3>Total cards</h3>
+        <div class="market-bar"><div class="market-fill cards" id="fill-cards"></div></div>
+        <p><b id="lbl-over35"></b> over 3.5 &nbsp;&middot;&nbsp; <b id="lbl-under35"></b> under 3.5</p>
+        <p class="ref-note" id="ref-note"></p>
+      </div>
+    </div>
+  </div>
+
+  <p id="error-msg" class="error" hidden></p>
+</section>
+
+<section class="data-status">
+  <p id="status-text">Data last refreshed {{ last_updated.strftime('%d %b %Y, %H:%M') }}.</p>
+  <button id="refresh-btn" type="button">Check for new results</button>
+</section>
+
+<script>
+const form = document.getElementById('predict-form');
+const result = document.getElementById('result');
+const errorMsg = document.getElementById('error-msg');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errorMsg.hidden = true;
+  const home = document.getElementById('home').value;
+  const away = document.getElementById('away').value;
+  const referee = document.getElementById('referee').value;
+
+  const btn = form.querySelector('.predict-btn');
+  btn.disabled = true;
+  btn.textContent = 'Working…';
+
+  try {
+    const res = await fetch('/api/predict', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({home, away, referee}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+
+    document.getElementById('res-home').textContent = home;
+    document.getElementById('res-away').textContent = away;
+    document.getElementById('res-score').textContent =
+      data.home_win_pct >= data.away_win_pct ? 'favours ' + home : 'favours ' + away;
+
+    document.getElementById('seg-home').style.width = data.home_win_pct + '%';
+    document.getElementById('seg-draw').style.width = data.draw_pct + '%';
+    document.getElementById('seg-away').style.width = data.away_win_pct + '%';
+    document.getElementById('lbl-home').textContent = data.home_win_pct + '%';
+    document.getElementById('lbl-draw').textContent = data.draw_pct + '%';
+    document.getElementById('lbl-away').textContent = data.away_win_pct + '%';
+
+    document.getElementById('fill-goals').style.width = data['over_2.5_goals_pct'] + '%';
+    document.getElementById('lbl-over25').textContent = data['over_2.5_goals_pct'] + '%';
+    document.getElementById('lbl-under25').textContent = data['under_2.5_goals_pct'] + '%';
+
+    document.getElementById('fill-cards').style.width = data['over_3.5_cards_pct'] + '%';
+    document.getElementById('lbl-over35').textContent = data['over_3.5_cards_pct'] + '%';
+    document.getElementById('lbl-under35').textContent = data['under_3.5_cards_pct'] + '%';
+    document.getElementById('ref-note').textContent =
+      referee + ' averages ' + data.referee_avg_cards_per_game + ' cards a game on record.';
+
+    result.hidden = false;
+  } catch (err) {
+    errorMsg.textContent = err.message;
+    errorMsg.hidden = false;
+    result.hidden = true;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Predict';
+  }
+});
+
+document.getElementById('refresh-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('refresh-btn');
+  const status = document.getElementById('status-text');
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  try {
+    const res = await fetch('/api/refresh', {method: 'POST'});
+    const data = await res.json();
+    status.textContent = data.changed
+      ? 'New results found and models retrained. Data now current as of ' + data.last_updated + '.'
+      : 'No new results since ' + data.last_updated + ' — already current.';
+  } catch (err) {
+    status.textContent = 'Could not check for updates right now.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Check for new results';
+  }
+});
+</script>
+{% endblock %}
