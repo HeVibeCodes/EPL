@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+.env
+*.log
+
+# Deliberately NOT ignoring data/ or models/ -- the deployed site loads
+# both directly, and the GitHub Actions refresh workflow commits updates
+# to them so a redeploy always has current data.

@@ -4,7 +4,7 @@
 
 <section class="hero">
   <h1>Pick a fixture, get the numbers.</h1>
-  <p class="lede">Win probabilities, the goals line, and the cards line &mdash; built from
+  <p class="lede">Win probabilities, every goals/cards/corners line, and BTTS &mdash; built from
     {{ n_matches }} Premier League matches across {{ n_seasons }} season{{ 's' if n_seasons != 1 else '' }},
     weighted by each team's recent form and the referee appointed to the game.</p>
 </section>
@@ -58,19 +58,25 @@
       <span>Away win <b id="lbl-away"></b></span>
     </div>
 
-    <div class="markets">
-      <div class="market">
-        <h3>Total goals</h3>
-        <div class="market-bar"><div class="market-fill goals" id="fill-goals"></div></div>
-        <p><b id="lbl-over25"></b> over 2.5 &nbsp;&middot;&nbsp; <b id="lbl-under25"></b> under 2.5</p>
+    <div class="context-row">
+      <div class="form-block">
+        <h3 id="home-form-label"></h3>
+        <div class="form-badges" id="home-form"></div>
       </div>
-      <div class="market">
-        <h3>Total cards</h3>
-        <div class="market-bar"><div class="market-fill cards" id="fill-cards"></div></div>
-        <p><b id="lbl-over35"></b> over 3.5 &nbsp;&middot;&nbsp; <b id="lbl-under35"></b> under 3.5</p>
-        <p class="ref-note" id="ref-note"></p>
+      <div class="form-block">
+        <h3 id="away-form-label"></h3>
+        <div class="form-badges" id="away-form"></div>
       </div>
     </div>
+    <p class="rest-line" id="rest-line"></p>
+
+    <details class="h2h-panel">
+      <summary>Head-to-head, last 5 meetings</summary>
+      <div id="h2h-list" class="h2h-list"></div>
+    </details>
+
+    <div class="markets" id="markets-container"></div>
+    <p class="ref-note" id="ref-note"></p>
   </div>
 
   <p id="error-msg" class="error" hidden></p>
@@ -85,6 +91,44 @@
 const form = document.getElementById('predict-form');
 const result = document.getElementById('result');
 const errorMsg = document.getElementById('error-msg');
+
+function formBadges(matches) {
+  if (!matches || !matches.length) return '<span class="muted">No recent matches on file</span>';
+  return matches.map(m =>
+    `<span class="badge badge-${m.result}" title="${m.date} vs ${m.opponent} (${m.venue === 'H' ? 'home' : 'away'}) ${m.score}">${m.result}</span>`
+  ).join('');
+}
+
+function h2hRows(h2h) {
+  if (!h2h || !h2h.length) return '<p class="muted">These two haven\'t met recently.</p>';
+  return h2h.map(m =>
+    `<div class="h2h-row"><span>${m.date}</span><span>${m.home} <b>${m.score}</b> ${m.away}</span></div>`
+  ).join('');
+}
+
+function marketGroup(title, lines) {
+  if (!lines || !lines.length) return '';
+  const rows = lines.map(l => `
+    <div class="market-line">
+      <span class="market-line-label">${l.line}</span>
+      <div class="market-bar"><div class="market-fill" style="width:${l.over_pct}%"></div></div>
+      <span class="market-line-pct">${l.over_pct}% over</span>
+    </div>`).join('');
+  return `<div class="market"><h3>${title}</h3>${rows}</div>`;
+}
+
+function bttsGroup(btts) {
+  if (!btts) return '';
+  return `
+    <div class="market">
+      <h3>Both teams to score</h3>
+      <div class="market-line">
+        <span class="market-line-label">Yes</span>
+        <div class="market-bar"><div class="market-fill" style="width:${btts.yes_pct}%"></div></div>
+        <span class="market-line-pct">${btts.yes_pct}%</span>
+      </div>
+    </div>`;
+}
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -109,22 +153,34 @@ form.addEventListener('submit', async (e) => {
     document.getElementById('res-home').textContent = home;
     document.getElementById('res-away').textContent = away;
     document.getElementById('res-score').textContent =
-      data.home_win_pct >= data.away_win_pct ? 'favours ' + home : 'favours ' + away;
+      data.outcome.home_win_pct >= data.outcome.away_win_pct ? 'favours ' + home : 'favours ' + away;
 
-    document.getElementById('seg-home').style.width = data.home_win_pct + '%';
-    document.getElementById('seg-draw').style.width = data.draw_pct + '%';
-    document.getElementById('seg-away').style.width = data.away_win_pct + '%';
-    document.getElementById('lbl-home').textContent = data.home_win_pct + '%';
-    document.getElementById('lbl-draw').textContent = data.draw_pct + '%';
-    document.getElementById('lbl-away').textContent = data.away_win_pct + '%';
+    document.getElementById('seg-home').style.width = data.outcome.home_win_pct + '%';
+    document.getElementById('seg-draw').style.width = data.outcome.draw_pct + '%';
+    document.getElementById('seg-away').style.width = data.outcome.away_win_pct + '%';
+    document.getElementById('lbl-home').textContent = data.outcome.home_win_pct + '%';
+    document.getElementById('lbl-draw').textContent = data.outcome.draw_pct + '%';
+    document.getElementById('lbl-away').textContent = data.outcome.away_win_pct + '%';
 
-    document.getElementById('fill-goals').style.width = data['over_2.5_goals_pct'] + '%';
-    document.getElementById('lbl-over25').textContent = data['over_2.5_goals_pct'] + '%';
-    document.getElementById('lbl-under25').textContent = data['under_2.5_goals_pct'] + '%';
+    document.getElementById('home-form-label').textContent = home + ' — last 5';
+    document.getElementById('away-form-label').textContent = away + ' — last 5';
+    document.getElementById('home-form').innerHTML = formBadges(data.context.home_form);
+    document.getElementById('away-form').innerHTML = formBadges(data.context.away_form);
 
-    document.getElementById('fill-cards').style.width = data['over_3.5_cards_pct'] + '%';
-    document.getElementById('lbl-over35').textContent = data['over_3.5_cards_pct'] + '%';
-    document.getElementById('lbl-under35').textContent = data['under_3.5_cards_pct'] + '%';
+    const hr = data.context.home_rest_days, ar = data.context.away_rest_days;
+    document.getElementById('rest-line').textContent =
+      (hr != null ? home + ': ' + hr + ' days rest' : '') +
+      (hr != null && ar != null ? '  ·  ' : '') +
+      (ar != null ? away + ': ' + ar + ' days rest' : '');
+
+    document.getElementById('h2h-list').innerHTML = h2hRows(data.context.h2h);
+
+    document.getElementById('markets-container').innerHTML =
+      marketGroup('Total goals', data.markets.goals) +
+      bttsGroup(data.markets.btts) +
+      marketGroup('Total cards', data.markets.cards) +
+      marketGroup('Total corners', data.markets.corners);
+
     document.getElementById('ref-note').textContent =
       referee + ' averages ' + data.referee_avg_cards_per_game + ' cards a game on record.';
 
