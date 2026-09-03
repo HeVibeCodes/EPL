@@ -1,125 +1,125 @@
 {
   "1X2": {
-    "model": "random_forest",
-    "accuracy": 0.39473684210526316,
-    "log_loss": 1.082983864785971,
+    "model": "logistic_regression",
+    "accuracy": 0.45263157894736844,
+    "log_loss": 1.151055095185708,
     "per_class": {
       "Home": {
-        "sensitivity": 0.45714285714285713,
-        "specificity": 0.7317073170731707
+        "sensitivity": 0.5061728395061729,
+        "specificity": 0.7247706422018348
       },
       "Draw": {
-        "sensitivity": 0.14285714285714285,
-        "specificity": 0.8363636363636363
+        "sensitivity": 0.0673076923076923,
+        "specificity": 0.9746376811594203
       },
       "Away": {
-        "sensitivity": 0.55,
-        "specificity": 0.5357142857142857
+        "sensitivity": 0.7280701754385965,
+        "specificity": 0.4699248120300752
       }
     }
   },
   "goals_over_0.5": {
     "model": "hist_gradient_boosting",
-    "decision_threshold": 0.42,
-    "accuracy": 0.881578947368421,
-    "auc": 0.4201388888888889,
-    "brier": 0.22981292073283854,
-    "sensitivity": 0.9305555555555556,
-    "specificity": 0.0
-  },
-  "goals_over_1.5": {
-    "model": "hist_gradient_boosting",
-    "decision_threshold": 0.55,
-    "accuracy": 0.21052631578947367,
-    "auc": 0.6918032786885246,
-    "brier": 0.2514853874719648,
-    "sensitivity": 0.01639344262295082,
-    "specificity": 1.0
-  },
-  "goals_over_2.5": {
-    "model": "hist_gradient_boosting",
-    "decision_threshold": 0.5,
-    "accuracy": 0.5526315789473685,
-    "auc": 0.6030814380044022,
-    "brier": 0.248906403314236,
-    "sensitivity": 0.46808510638297873,
-    "specificity": 0.6896551724137931
-  },
-  "goals_over_3.5": {
-    "model": "gradient_boosting",
-    "decision_threshold": 0.53,
-    "accuracy": 0.5,
-    "auc": 0.5169642857142858,
-    "brier": 0.255302838913471,
-    "sensitivity": 0.4,
-    "specificity": 0.5357142857142857
-  },
-  "goals_over_4.5": {
-    "model": "random_forest",
-    "decision_threshold": 0.45,
-    "accuracy": 0.2236842105263158,
-    "auc": 0.4554865424430642,
-    "brier": 0.24803462508602012,
-    "sensitivity": 0.8571428571428571,
-    "specificity": 0.15942028985507245
-  },
-  "cards_over_3.5": {
-    "model": "gradient_boosting",
-    "decision_threshold": 0.53,
-    "accuracy": 0.40789473684210525,
-    "auc": 0.43269908386187456,
-    "brier": 0.2587942327616723,
-    "sensitivity": 0.18604651162790697,
-    "specificity": 0.696969696969697
-  },
-  "cards_over_4.5": {
-    "model": "hist_gradient_boosting",
-    "decision_threshold": 0.53,
-    "accuracy": 0.6842105263157895,
-    "auc": 0.47390572390572394,
-    "brier": 0.2501593889810826,
-    "sensitivity": 0.13636363636363635,
-    "specificity": 0.9074074074074074
-  },
-  "corners_over_8.5": {
-    "model": "gradient_boosting",
-    "decision_threshold": 0.5,
-    "accuracy": 0.5394736842105263,
-    "auc": 0.573076923076923,
-    "brier": 0.2478868504176792,
-    "sensitivity": 0.52,
-    "specificity": 0.5769230769230769
-  },
-  "corners_over_9.5": {
-    "model": "hist_gradient_boosting",
-    "decision_threshold": 0.5,
-    "accuracy": 0.5789473684210527,
-    "auc": 0.5298295454545454,
-    "brier": 0.24867296834891497,
-    "sensitivity": 0.6590909090909091,
-    "specificity": 0.46875
-  },
-  "corners_over_10.5": {
-    "model": "logistic_regression",
     "decision_threshold": 0.05,
-    "accuracy": 0.47368421052631576,
-    "auc": 0.5263888888888889,
-    "brier": 0.24979247862332823,
+    "accuracy": 0.9289473684210526,
+    "auc": 0.5185185185185185,
+    "brier": 0.25151006100899304,
     "sensitivity": 1.0,
     "specificity": 0.0
   },
-  "btts": {
+  "goals_over_1.5": {
+    "model": "random_forest",
+    "decision_threshold": 0.55,
+    "accuracy": 0.27631578947368424,
+    "auc": 0.545625,
+    "brier": 0.24052505423863083,
+    "sensitivity": 0.1,
+    "specificity": 0.9375
+  },
+  "goals_over_2.5": {
+    "model": "random_forest",
+    "decision_threshold": 0.53,
+    "accuracy": 0.5236842105263158,
+    "auc": 0.5308486527323092,
+    "brier": 0.24715460036450526,
+    "sensitivity": 0.49760765550239233,
+    "specificity": 0.5555555555555556
+  },
+  "goals_over_3.5": {
+    "model": "random_forest",
+    "decision_threshold": 0.47,
+    "accuracy": 0.29210526315789476,
+    "auc": 0.4887322984749456,
+    "brier": 0.2647740530347553,
+    "sensitivity": 1.0,
+    "specificity": 0.011029411764705883
+  },
+  "goals_over_4.5": {
     "model": "logistic_regression",
-    "decision_threshold": 0.6,
-    "accuracy": 0.42105263157894735,
-    "auc": 0.48879551820728295,
-    "brier": 0.2509803652148295,
+    "decision_threshold": 0.57,
+    "accuracy": 0.7421052631578947,
+    "auc": 0.5538565879524016,
+    "brier": 0.2862569833148148,
+    "sensitivity": 0.14285714285714285,
+    "specificity": 0.8308157099697885
+  },
+  "cards_over_3.5": {
+    "model": "random_forest",
+    "decision_threshold": 0.55,
+    "accuracy": 0.5605263157894737,
+    "auc": 0.5388378173231003,
+    "brier": 0.24604010215692365,
+    "sensitivity": 0.8591549295774648,
+    "specificity": 0.17964071856287425
+  },
+  "cards_over_4.5": {
+    "model": "random_forest",
+    "decision_threshold": 0.53,
+    "accuracy": 0.4605263157894737,
+    "auc": 0.554259770319594,
+    "brier": 0.2657602362030068,
+    "sensitivity": 0.9078014184397163,
+    "specificity": 0.19665271966527198
+  },
+  "corners_over_8.5": {
+    "model": "random_forest",
+    "decision_threshold": 0.53,
+    "accuracy": 0.3368421052631579,
+    "auc": 0.4263874733623645,
+    "brier": 0.2481727178706054,
     "sensitivity": 0.0,
-    "specificity": 0.9411764705882353
+    "specificity": 0.9922480620155039
+  },
+  "corners_over_9.5": {
+    "model": "random_forest",
+    "decision_threshold": 0.47,
+    "accuracy": 0.5631578947368421,
+    "auc": 0.4236009458394325,
+    "brier": 0.250464724966226,
+    "sensitivity": 1.0,
+    "specificity": 0.0
+  },
+  "corners_over_10.5": {
+    "model": "gradient_boosting",
+    "decision_threshold": 0.5,
+    "accuracy": 0.45,
+    "auc": 0.42804864317081415,
+    "brier": 0.2510284682590583,
+    "sensitivity": 0.26506024096385544,
+    "specificity": 0.5934579439252337
+  },
+  "btts": {
+    "model": "hist_gradient_boosting",
+    "decision_threshold": 0.05,
+    "accuracy": 0.5605263157894737,
+    "auc": 0.4715920272131793,
+    "brier": 0.24998007161874675,
+    "sensitivity": 1.0,
+    "specificity": 0.0
   },
   "baseline_class_split": {
-    "0": 0.41776315789473684,
-    "2": 0.3092105263157895,
-    "1": 0.2730263157894737
+    "0": 0.4580233793836344,
+    "2": 0.2956429330499469,
+    "1": 0.2463336875664187
   }
 }
