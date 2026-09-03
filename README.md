@@ -2,13 +2,45 @@
 
 Predicts, for any Premier League fixture:
 - **1X2**: Home win / Draw / Away win probabilities
-- **Goals market**: Over/Under 2.5 total goals (thresholds 1.5/2.5/3.5 all built in)
-- **Cards market**: Over/Under 3.5 total cards, driven by the referee's career profile
+- **Goals markets**: Over/Under at 0.5 / 1.5 / 2.5 / 3.5 / 4.5 total goals
+- **Cards markets**: Over/Under at 3.5 / 4.5 total cards, driven by the referee's career profile
+- **Corners markets**: Over/Under at 8.5 / 9.5 / 10.5 total corners
+- **BTTS**: Both teams to score, yes/no
+- **Match context**: each team's last 5 results, the last 5 head-to-head
+  meetings between the two sides, and days of rest since each team's last match
 - Everything is conditioned on **team form** and **the specific referee assigned**
 
 Built on free, public data from [football-data.co.uk](https://www.football-data.co.uk/),
 which has covered referee names, fouls, cards, shots and corners for every
 Premier League match since the **2000/01 season**.
+
+### A note on accuracy vs. balance
+
+You'll notice some markets (`goals_over_0.5` especially) can show a low raw
+"accuracy" number even though the model is working as designed. That's
+because every binary model here is trained with class-balanced sample
+weights and a threshold tuned to maximize sensitivity + specificity
+together (see `src/train.py`), rather than picking whichever answer is
+right most often. For a market like "over 0.5 goals" -- true in roughly
+95% of real matches -- a model that just always says "yes" would score
+~95% accuracy while being useless at spotting the rare low-scoring games.
+The balanced approach trades some raw accuracy for actually being able to
+distinguish both outcomes. If you'd rather optimize purely for accuracy on
+lopsided markets, drop the `fit_balanced()` call for those specific targets
+in `train.py`.
+
+### What's not in here, on purpose
+
+Two documents shared during development asked for manager selection,
+formations/tactical style, expected goals (xG), player injuries, and
+set-piece/crossing stats. None of those are available from
+football-data.co.uk (the free source this project uses), and there's no
+free bulk historical source for them either -- they'd need a paid provider
+(API-Football, Opta, StatsBomb) or heavy per-match scraping. Everything
+that WAS achievable with the existing free data (extra goal lines, BTTS,
+corners, first-half-adjacent markets via the half-time columns, H2H, recent
+form, rest days) is built and working. See the "Player-level data" section
+further down for the same caveat as it applies to lineups specifically.
 
 ## Quick start
 
@@ -18,10 +50,14 @@ pip install -r requirements.txt
 # 1. Download full history (2000/01 -> present, ~26 seasons)
 python src/download_data.py
 
-# 2. Build features, train all 3 models, print evaluation metrics
+# 2. Build features, train every market, print evaluation metrics
+#    (12 models total: 1X2 + 11 over/under markets, each with its own
+#    model bake-off -- expect this to take longer than before, scaling
+#    with how many seasons you've downloaded)
 python src/train.py
 
-# 3a. Predict a fixture from the console
+# 3a. Predict a fixture from the console (prints full JSON: outcome,
+#     every market, and match context)
 python src/predict.py "Arsenal" "Chelsea" "A Taylor"
 
 # 3b. ...or launch the website and predict from a browser
@@ -68,12 +104,17 @@ hits `/api/refresh`.
 
 `app.py` is a small Flask app:
 - `/` &mdash; pick a home team, away team, and referee, get win/draw/loss
-  probabilities plus the goals and cards lines, styled as a matchday ticket.
+  probabilities, every goals/cards/corners line, BTTS, plus a match-context
+  panel (last 5 form for both sides, last 5 head-to-head meetings, days of
+  rest for each team) &mdash; all styled as a matchday ticket.
 - `/referees` &mdash; the full referee leaderboard (cards, fouls, reds per
   game, home win rate under that ref).
 - `/api/predict`, `/api/refresh`, `/api/status` &mdash; JSON endpoints the
   pages call; also usable directly if you want to build another frontend
-  against the same models.
+  against the same models. `/api/predict`'s response is structured as
+  `{fixture, referee, referee_avg_cards_per_game, outcome, markets, context}`
+  &mdash; `markets` groups by `goals`/`cards`/`corners` (each a list of
+  `{line, over_pct, under_pct}`) plus `btts` (`{yes_pct, no_pct}`).
 
 Run it locally with `python app.py` (defaults to port 5000, override with
 the `PORT` env var). It loads the feature table and models into memory once
@@ -81,17 +122,34 @@ at startup and keeps them there; predictions are near-instant.
 
 ### Deploying the website
 
-The built-in Flask server is for local use only. To put it somewhere
-reachable by other people, run it behind a production WSGI server, e.g.:
-```bash
-pip install gunicorn
-gunicorn -w 2 -b 0.0.0.0:8000 app:app
-```
-then put nginx or Caddy in front of it for TLS. Any host that runs a
-Python process works (a small VPS, Render, Railway, Fly.io, PythonAnywhere,
-etc.) -- there's nothing here that needs a specific provider. Pair it with
-the cron/`scheduler.py` job above so the deployed copy keeps itself current
-without you redeploying.
+The built-in Flask server is for local use only. `gunicorn` is already in
+`requirements.txt` and there's a `Procfile` (`web: gunicorn app:app`) so
+most platform-as-a-service hosts detect and run it automatically.
+
+**Easiest path -- Render.com (free tier):**
+1. Push this project to a GitHub repo. Make sure `data/` and `models/`
+   are actually committed (see `.gitignore` -- they're deliberately not
+   excluded) since the site loads both directly rather than retraining
+   on every request.
+2. On [render.com](https://render.com): New → Web Service → connect the
+   repo. Build command: `pip install -r requirements.txt`. Start command:
+   `gunicorn app:app`. Deploy.
+3. You'll get a public URL in a few minutes.
+
+**Important caveat on free tiers:** most free hosting has no persistent
+disk -- the filesystem resets on every restart/redeploy, so `data/raw/`
+and `models/` only ever reflect what's in your last git commit, not
+whatever `/api/refresh` pulled in during the running process. The
+`.github/workflows/refresh-data.yml` workflow included here solves this
+for free: GitHub Actions runs `update_data.py` on a schedule (every 6
+hours by default), and if new results changed the data, it retrains and
+pushes the updated files -- which triggers your host to redeploy with
+fresh data automatically. No server of your own required for the
+scheduling part.
+
+**Other hosts** that work the same way: Railway, Fly.io, PythonAnywhere,
+or any VPS (put nginx or Caddy in front of gunicorn for TLS). None of this
+is Render-specific -- pick whichever you're comfortable with.
 
 ## What's already included in this delivery
 
@@ -148,8 +206,16 @@ epl_predictor/
    season on file, Attwell averages 4.68 cards/game vs Pawson at 2.76.
 4. **Squad-strength proxy** -- see the "Player-level data" section below;
    this is the one part of your original ask I could only approximate.
-5. **Targets** -- match result, over/under at 1.5/2.5/3.5 goals, over/under
-   at 3.5/4.5 total cards.
+5. **Targets** -- match result; over/under at 0.5/1.5/2.5/3.5/4.5 goals;
+   over/under at 3.5/4.5 cards; over/under at 8.5/9.5/10.5 corners; BTTS.
+   All defined in `features.MARKET_DEFS` -- add a market by adding one
+   entry there, and `train.py`/`predict.py` pick it up automatically.
+6. **Match context (display-only, not model input)** -- `recent_results()`
+   and `head_to_head_matches()` in `features.py` return the last 5 results
+   for a team and the last 5 meetings between two teams respectively, for
+   the website's context panel. Rest days (`Home_DaysSinceLast` /
+   `Away_DaysSinceLast`) ARE model features (rolling form already includes
+   them) as well as being shown directly on the site.
 
 ## Player-level data: an important caveat
 

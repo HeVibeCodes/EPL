@@ -1,44 +1,125 @@
 {
   "1X2": {
     "model": "random_forest",
-    "accuracy": 0.4151436031331593,
-    "log_loss": 1.0745564441751392,
+    "accuracy": 0.39473684210526316,
+    "log_loss": 1.082983864785971,
     "per_class": {
       "Home": {
-        "sensitivity": 0.5246913580246914,
-        "specificity": 0.665158371040724
+        "sensitivity": 0.45714285714285713,
+        "specificity": 0.7317073170731707
       },
       "Draw": {
-        "sensitivity": 0.102803738317757,
-        "specificity": 0.8442028985507246
+        "sensitivity": 0.14285714285714285,
+        "specificity": 0.8363636363636363
       },
       "Away": {
-        "sensitivity": 0.5526315789473685,
-        "specificity": 0.6022304832713755
+        "sensitivity": 0.55,
+        "specificity": 0.5357142857142857
       }
     }
   },
-  "OverUnder2.5": {
-    "model": "random_forest",
-    "decision_threshold": 0.53,
-    "accuracy": 0.4830287206266319,
-    "auc": 0.5188912720673156,
-    "brier": 0.24859243436993098,
-    "sensitivity": 0.3875598086124402,
-    "specificity": 0.5977011494252874
+  "goals_over_0.5": {
+    "model": "hist_gradient_boosting",
+    "decision_threshold": 0.42,
+    "accuracy": 0.881578947368421,
+    "auc": 0.4201388888888889,
+    "brier": 0.22981292073283854,
+    "sensitivity": 0.9305555555555556,
+    "specificity": 0.0
   },
-  "CardsOver3.5": {
-    "model": "random_forest",
+  "goals_over_1.5": {
+    "model": "hist_gradient_boosting",
     "decision_threshold": 0.55,
-    "accuracy": 0.5613577023498695,
-    "auc": 0.5498170326014638,
-    "brier": 0.24483087771868833,
-    "sensitivity": 0.8472222222222222,
-    "specificity": 0.19161676646706588
+    "accuracy": 0.21052631578947367,
+    "auc": 0.6918032786885246,
+    "brier": 0.2514853874719648,
+    "sensitivity": 0.01639344262295082,
+    "specificity": 1.0
+  },
+  "goals_over_2.5": {
+    "model": "hist_gradient_boosting",
+    "decision_threshold": 0.5,
+    "accuracy": 0.5526315789473685,
+    "auc": 0.6030814380044022,
+    "brier": 0.248906403314236,
+    "sensitivity": 0.46808510638297873,
+    "specificity": 0.6896551724137931
+  },
+  "goals_over_3.5": {
+    "model": "gradient_boosting",
+    "decision_threshold": 0.53,
+    "accuracy": 0.5,
+    "auc": 0.5169642857142858,
+    "brier": 0.255302838913471,
+    "sensitivity": 0.4,
+    "specificity": 0.5357142857142857
+  },
+  "goals_over_4.5": {
+    "model": "random_forest",
+    "decision_threshold": 0.45,
+    "accuracy": 0.2236842105263158,
+    "auc": 0.4554865424430642,
+    "brier": 0.24803462508602012,
+    "sensitivity": 0.8571428571428571,
+    "specificity": 0.15942028985507245
+  },
+  "cards_over_3.5": {
+    "model": "gradient_boosting",
+    "decision_threshold": 0.53,
+    "accuracy": 0.40789473684210525,
+    "auc": 0.43269908386187456,
+    "brier": 0.2587942327616723,
+    "sensitivity": 0.18604651162790697,
+    "specificity": 0.696969696969697
+  },
+  "cards_over_4.5": {
+    "model": "hist_gradient_boosting",
+    "decision_threshold": 0.53,
+    "accuracy": 0.6842105263157895,
+    "auc": 0.47390572390572394,
+    "brier": 0.2501593889810826,
+    "sensitivity": 0.13636363636363635,
+    "specificity": 0.9074074074074074
+  },
+  "corners_over_8.5": {
+    "model": "gradient_boosting",
+    "decision_threshold": 0.5,
+    "accuracy": 0.5394736842105263,
+    "auc": 0.573076923076923,
+    "brier": 0.2478868504176792,
+    "sensitivity": 0.52,
+    "specificity": 0.5769230769230769
+  },
+  "corners_over_9.5": {
+    "model": "hist_gradient_boosting",
+    "decision_threshold": 0.5,
+    "accuracy": 0.5789473684210527,
+    "auc": 0.5298295454545454,
+    "brier": 0.24867296834891497,
+    "sensitivity": 0.6590909090909091,
+    "specificity": 0.46875
+  },
+  "corners_over_10.5": {
+    "model": "logistic_regression",
+    "decision_threshold": 0.05,
+    "accuracy": 0.47368421052631576,
+    "auc": 0.5263888888888889,
+    "brier": 0.24979247862332823,
+    "sensitivity": 1.0,
+    "specificity": 0.0
+  },
+  "btts": {
+    "model": "logistic_regression",
+    "decision_threshold": 0.6,
+    "accuracy": 0.42105263157894735,
+    "auc": 0.48879551820728295,
+    "brier": 0.2509803652148295,
+    "sensitivity": 0.0,
+    "specificity": 0.9411764705882353
   },
   "baseline_class_split": {
-    "0": 0.45877126449236105,
-    "2": 0.29407303066421064,
-    "1": 0.24715570484342833
+    "0": 0.41776315789473684,
+    "2": 0.3092105263157895,
+    "1": 0.2730263157894737
   }
 }

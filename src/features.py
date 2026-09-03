@@ -34,6 +34,27 @@ RESULT_MAP = {"H": 0, "D": 1, "A": 2}  # class indices for the 1X2 model
 # --------------------------------------------------------------------------- #
 # 1. Load & tidy
 # --------------------------------------------------------------------------- #
+def _parse_date_column(s: pd.Series) -> pd.Series:
+    """
+    Parse one file's Date column using WHICHEVER single format explains
+    almost all of its rows, tried in order: ISO (yyyy-mm-dd), then UK-style
+    dd/mm/yyyy, then dd/mm/yy.
+
+    This matters because pandas' format="mixed" heuristic, applied across a
+    column that blends formats, can silently swap day/month for ambiguous
+    dates (any day <= 12) -- e.g. misreading 2025-11-01 (1 Nov) as if it
+    were 2025-01-11 (11 Jan). Detecting the format PER FILE first (each
+    football-data.co.uk file uses one consistent format internally) avoids
+    that ambiguity entirely instead of guessing row-by-row.
+    """
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d/%m/%y"):
+        parsed = pd.to_datetime(s, format=fmt, errors="coerce")
+        if parsed.notna().mean() > 0.95:  # this format explains almost every row
+            return parsed
+    # no single format fit well -- fall back to pandas' best guess
+    return pd.to_datetime(s, errors="coerce", dayfirst=True)
+
+
 def load_all_seasons(raw_dir: str = RAW_DIR) -> pd.DataFrame:
     files = sorted(glob.glob(os.path.join(raw_dir, "season-*.csv")))
     if not files:
@@ -61,15 +82,13 @@ def load_all_seasons(raw_dir: str = RAW_DIR) -> pd.DataFrame:
             print(f"  skipping {os.path.basename(f)}: no usable rows")
             continue
         df["season"] = os.path.basename(f).replace("season-", "").replace(".csv", "")
+        df["Date"] = _parse_date_column(df["Date"])  # parsed per-file, before concatenation
         frames.append(df)
 
     if not frames:
         raise ValueError(f"None of the files in {raw_dir} could be parsed.")
 
     df = pd.concat(frames, ignore_index=True, sort=False)
-
-    # season files mix date formats across eras: dd/mm/yy, dd/mm/yyyy, yyyy-mm-dd
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce", format="mixed", dayfirst=True)
     df = df.dropna(subset=["Date", "FTR"]).sort_values("Date").reset_index(drop=True)
 
     # normalise column presence -- very old seasons lack some stat columns
@@ -80,6 +99,9 @@ def load_all_seasons(raw_dir: str = RAW_DIR) -> pd.DataFrame:
     df["TotalGoals"] = df["FTHG"] + df["FTAG"]
     df["TotalCards"] = df[["HY", "AY", "HR", "AR"]].sum(axis=1)
     df["TotalFouls"] = df[["HF", "AF"]].sum(axis=1)
+    df["TotalCorners"] = df[["HC", "AC"]].sum(axis=1)
+    df["TotalShots"] = df[["HS", "AS"]].sum(axis=1)
+    df["BTTS"] = ((df["FTHG"] > 0) & (df["FTAG"] > 0)).astype(int)
     return df
 
 
@@ -114,6 +136,48 @@ def _team_match_log(df: pd.DataFrame) -> pd.DataFrame:
 
     long_df = pd.concat([home, away], ignore_index=True).sort_values(["Team", "Date"])
     return long_df
+
+
+def team_match_log(df: pd.DataFrame) -> pd.DataFrame:
+    """Public wrapper around _team_match_log for callers outside this module
+    (the website uses this for recent-form and head-to-head display)."""
+    return _team_match_log(df)
+
+
+def recent_results(df: pd.DataFrame, team: str, n: int = 5) -> list[dict]:
+    """Last n matches for a team, most recent first, as plain W/D/L rows for
+    display (not model input -- rolling form features already cover that)."""
+    log = _team_match_log(df)
+    rows = log[log["Team"] == team].sort_values("Date", ascending=False).head(n)
+    out = []
+    for _, r in rows.iterrows():
+        result = "W" if r["GF"] > r["GA"] else ("L" if r["GF"] < r["GA"] else "D")
+        out.append({
+            "date": r["Date"].strftime("%d %b %Y"),
+            "opponent": r["Opponent"],
+            "venue": r["Venue"],
+            "score": f"{int(r['GF'])}-{int(r['GA'])}",
+            "result": result,
+        })
+    return out
+
+
+def head_to_head_matches(df: pd.DataFrame, home_team: str, away_team: str, n: int = 5) -> list[dict]:
+    """Last n meetings between these two exact teams, most recent first."""
+    mask = (
+        ((df["HomeTeam"] == home_team) & (df["AwayTeam"] == away_team))
+        | ((df["HomeTeam"] == away_team) & (df["AwayTeam"] == home_team))
+    )
+    rows = df[mask].sort_values("Date", ascending=False).head(n)
+    out = []
+    for _, r in rows.iterrows():
+        out.append({
+            "date": r["Date"].strftime("%d %b %Y"),
+            "home": r["HomeTeam"],
+            "away": r["AwayTeam"],
+            "score": f"{int(r['FTHG'])}-{int(r['FTAG'])}",
+        })
+    return out
 
 
 def add_rolling_form(df: pd.DataFrame, windows=(5, 10)) -> pd.DataFrame:
@@ -263,13 +327,43 @@ def add_squad_strength_proxy(df: pd.DataFrame) -> pd.DataFrame:
 # --------------------------------------------------------------------------- #
 # 6. Targets
 # --------------------------------------------------------------------------- #
-def add_targets(df: pd.DataFrame, goal_lines=(1.5, 2.5, 3.5), card_lines=(3.5, 4.5)) -> pd.DataFrame:
+GOAL_LINES = (0.5, 1.5, 2.5, 3.5, 4.5)
+CARD_LINES = (3.5, 4.5)
+CORNER_LINES = (8.5, 9.5, 10.5)
+
+
+def add_targets(df: pd.DataFrame, goal_lines=GOAL_LINES, card_lines=CARD_LINES, corner_lines=CORNER_LINES) -> pd.DataFrame:
     df["Target_1X2"] = df["FTR"].map(RESULT_MAP)
     for line in goal_lines:
         df[f"Target_Over{line}"] = (df["TotalGoals"] > line).astype(int)
     for line in card_lines:
         df[f"Target_CardsOver{line}"] = (df["TotalCards"] > line).astype(int)
+    for line in corner_lines:
+        df[f"Target_CornersOver{line}"] = (df["TotalCorners"] > line).astype(int)
+    df["Target_BTTS"] = df["BTTS"]
     return df
+
+
+# Every binary market the site can predict, and which target column/model
+# file each one maps to. train.py loops over this to train each market;
+# predict.py and app.py loop over it to serve predictions. Add a market by
+# adding one line here -- nothing else needs to change.
+MARKET_DEFS = (
+    [{"key": f"goals_over_{line}", "target_col": f"Target_Over{line}",
+      "model_name": f"model_goals_{str(line).replace('.', '_')}",
+      "group": "goals", "line": line, "label": f"Over/Under {line} goals"}
+     for line in GOAL_LINES]
+    + [{"key": f"cards_over_{line}", "target_col": f"Target_CardsOver{line}",
+        "model_name": f"model_cards_{str(line).replace('.', '_')}",
+        "group": "cards", "line": line, "label": f"Over/Under {line} cards"}
+       for line in CARD_LINES]
+    + [{"key": f"corners_over_{line}", "target_col": f"Target_CornersOver{line}",
+        "model_name": f"model_corners_{str(line).replace('.', '_')}",
+        "group": "corners", "line": line, "label": f"Over/Under {line} corners"}
+       for line in CORNER_LINES]
+    + [{"key": "btts", "target_col": "Target_BTTS", "model_name": "model_btts",
+        "group": "btts", "line": None, "label": "Both teams to score"}]
+)
 
 
 # --------------------------------------------------------------------------- #

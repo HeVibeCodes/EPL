@@ -4,18 +4,19 @@ Predicts one upcoming fixture using the trained models.
 Usage:
     python src/predict.py "Arsenal" "Chelsea" "A Taylor"
 
-This looks up each team's current rolling form and the referee's
-career-to-date profile from the most recent data on file, builds the
-same feature row used in training, and returns:
+Looks up each team's current rolling form and the referee's career-to-date
+profile from the most recent data on file, builds the same feature row used
+in training, and returns:
   - Win / Draw / Loss probabilities
-  - Over/Under 2.5 goals probability
-  - Over/Under 3.5 cards probability (referee-driven)
+  - Every over/under market registered in features.MARKET_DEFS (goals at
+    0.5/1.5/2.5/3.5/4.5, cards at 3.5/4.5, corners at 8.5/9.5/10.5, BTTS)
+  - Match context: each team's last 5 results, the last 5 head-to-head
+    meetings, and days of rest since each team's last match
 """
-import sys
 import os
+import sys
 
 import joblib
-import numpy as np
 import pandas as pd
 
 import features
@@ -64,6 +65,19 @@ def latest_referee_profile(df: pd.DataFrame, referee: str) -> dict:
     }
 
 
+def _load_market_model(model_name: str):
+    """Returns (pipeline, fill_values, threshold) for one market, or None if
+    that market hasn't been trained yet (e.g. an older models/ folder)."""
+    path = os.path.join(MODEL_DIR, f"{model_name}.joblib")
+    if not os.path.exists(path):
+        return None
+    pipe = joblib.load(path)
+    fill_values = joblib.load(os.path.join(MODEL_DIR, f"{model_name}_fillvalues.joblib"))
+    threshold_path = os.path.join(MODEL_DIR, f"{model_name}_threshold.joblib")
+    threshold = joblib.load(threshold_path) if os.path.exists(threshold_path) else 0.5
+    return pipe, fill_values, threshold
+
+
 def predict_fixture(home_team: str, away_team: str, referee: str, df: pd.DataFrame | None = None):
     if df is None:
         df = build_feature_table()
@@ -82,36 +96,56 @@ def predict_fixture(home_team: str, away_team: str, referee: str, df: pd.DataFra
     feature_cols = features.FEATURE_COLUMNS
     X = pd.DataFrame([row])[feature_cols]
 
+    # --- 1X2 -----------------------------------------------------------
     m_1x2 = joblib.load(os.path.join(MODEL_DIR, "model_1x2.joblib"))
-    m_over25 = joblib.load(os.path.join(MODEL_DIR, "model_over25.joblib"))
-    m_cards35 = joblib.load(os.path.join(MODEL_DIR, "model_cards35.joblib"))
-
-    # fill missing features with the SAME per-column values used at training
-    # time (saved alongside each model), not medians recomputed from
-    # whatever data happens to be loaded now -- keeps predictions consistent
-    # with what the model actually learned.
-    def _fill_path(model_name):
-        return os.path.join(MODEL_DIR, f"{model_name}_fillvalues.joblib")
-
-    fv_1x2 = joblib.load(_fill_path("model_1x2"))
-    fv_over25 = joblib.load(_fill_path("model_over25"))
-    fv_cards35 = joblib.load(_fill_path("model_cards35"))
-
+    fv_1x2 = joblib.load(os.path.join(MODEL_DIR, "model_1x2_fillvalues.joblib"))
     p_1x2 = m_1x2.predict_proba(X.fillna(fv_1x2))[0]
-    p_over25 = m_over25.predict_proba(X.fillna(fv_over25))[0, 1]
-    p_cards35 = m_cards35.predict_proba(X.fillna(fv_cards35))[0, 1]
+
+    outcome = {
+        "home_win_pct": round(float(p_1x2[0]) * 100, 1),
+        "draw_pct": round(float(p_1x2[1]) * 100, 1),
+        "away_win_pct": round(float(p_1x2[2]) * 100, 1),
+    }
+
+    # --- every registered over/under + BTTS market ----------------------
+    markets = {"goals": [], "cards": [], "corners": [], "btts": None}
+    for market in features.MARKET_DEFS:
+        loaded = _load_market_model(market["model_name"])
+        if loaded is None:
+            continue  # model not trained yet -- skip rather than error
+        pipe, fill_values, threshold = loaded
+        proba_over = float(pipe.predict_proba(X.fillna(fill_values))[0, 1])
+        entry = {
+            "line": market["line"],
+            "label": market["label"],
+            "over_pct": round(proba_over * 100, 1),
+            "under_pct": round((1 - proba_over) * 100, 1),
+            "decision_threshold": threshold,
+        }
+        if market["group"] == "btts":
+            markets["btts"] = {
+                "yes_pct": entry["over_pct"],
+                "no_pct": entry["under_pct"],
+            }
+        else:
+            markets[market["group"]].append(entry)
+
+    # --- match context: form, head-to-head, rest days -------------------
+    context = {
+        "home_form": features.recent_results(df, home_team, n=5),
+        "away_form": features.recent_results(df, away_team, n=5),
+        "h2h": features.head_to_head_matches(df, home_team, away_team, n=5),
+        "home_rest_days": None if pd.isna(home_feats.get("Home_DaysSinceLast")) else int(home_feats["Home_DaysSinceLast"]),
+        "away_rest_days": None if pd.isna(away_feats.get("Away_DaysSinceLast")) else int(away_feats["Away_DaysSinceLast"]),
+    }
 
     return {
         "fixture": f"{home_team} vs {away_team}",
         "referee": referee,
         "referee_avg_cards_per_game": round(float(ref_feats["Ref_AvgCards"]), 2),
-        "home_win_pct": round(float(p_1x2[0]) * 100, 1),
-        "draw_pct": round(float(p_1x2[1]) * 100, 1),
-        "away_win_pct": round(float(p_1x2[2]) * 100, 1),
-        "over_2.5_goals_pct": round(float(p_over25) * 100, 1),
-        "under_2.5_goals_pct": round((1 - float(p_over25)) * 100, 1),
-        "over_3.5_cards_pct": round(float(p_cards35) * 100, 1),
-        "under_3.5_cards_pct": round((1 - float(p_cards35)) * 100, 1),
+        "outcome": outcome,
+        "markets": markets,
+        "context": context,
     }
 
 
@@ -120,6 +154,5 @@ if __name__ == "__main__":
     if len(args) != 3:
         print('Usage: python src/predict.py "HomeTeam" "AwayTeam" "Referee"')
         sys.exit(1)
-    result = predict_fixture(*args)
-    for k, v in result.items():
-        print(f"{k:28s}: {v}")
+    import json
+    print(json.dumps(predict_fixture(*args), indent=2, default=str))

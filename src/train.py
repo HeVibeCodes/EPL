@@ -289,10 +289,15 @@ def main():
     results = {}
     results["1X2"] = train_1x2(train, test, feature_cols)
     print()
-    results["OverUnder2.5"] = train_binary(train, test, feature_cols, "Target_Over2.5", "model_over25", "Over 2.5 goals")
-    print()
-    results["CardsOver3.5"] = train_binary(train, test, feature_cols, "Target_CardsOver3.5", "model_cards35", "Over 3.5 cards")
-    print()
+
+    # every over/under and BTTS market shares the same training code --
+    # add a market to features.MARKET_DEFS and it trains automatically here
+    for market in features.MARKET_DEFS:
+        results[market["key"]] = train_binary(
+            train, test, feature_cols, market["target_col"], market["model_name"], market["label"]
+        )
+        print()
+
     results["baseline_class_split"] = baseline_class_split(train)
 
     with open(os.path.join(MODEL_DIR, "metrics.json"), "w") as f:
